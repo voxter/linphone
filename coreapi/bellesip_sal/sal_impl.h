@@ -106,6 +106,7 @@ struct SalOp{
 	int auth_requests; /*number of auth requested for this op*/
 	bool_t cnx_ip_to_0000_if_sendonly_enabled;
 	bool_t auto_answer_asked;
+	int auto_answer_delay;
 	bool_t sdp_offering;
 	bool_t call_released;
 	bool_t manual_refresher;

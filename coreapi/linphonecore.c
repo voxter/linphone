@@ -159,6 +159,14 @@ bool_t linphone_call_asked_to_autoanswer(LinphoneCall *call){
 		return FALSE;
 }
 
+int linphone_call_autoanswer_delay(LinphoneCall *call){
+        if(call)
+                return sal_call_autoanswer_delay(call->op);
+        else
+                return 0;
+}
+
+
 int linphone_core_get_current_call_duration(const LinphoneCore *lc){
 	LinphoneCall *call=linphone_core_get_current_call((LinphoneCore *)lc);
 	if (call)  return linphone_call_get_duration(call);

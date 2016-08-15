@@ -576,6 +576,7 @@ static void process_request_event(void *op_base, const belle_sip_request_event_t
 				if ((call_info=belle_sip_message_get_header(BELLE_SIP_MESSAGE(req),"Call-Info"))) {
 					if( strstr(belle_sip_header_get_unparsed_value(call_info),"answer-after=") != NULL) {
 						op->auto_answer_asked=TRUE;
+						op->auto_answer_delay=atoi(belle_sip_header_get_unparsed_value(call_info),"answer-after=");
 						ms_message("The caller asked to automatically answer the call(Emergency?)\n");
 					}
 				}
@@ -1047,6 +1048,10 @@ int sal_call_terminate(SalOp *op){
 
 bool_t sal_call_autoanswer_asked(SalOp *op){
 	return op->auto_answer_asked;
+}
+
+int sal_call_autoanswer_delay(SalOp *op){
+	return op->auto_answer_delay;
 }
 
 void sal_call_send_vfu_request(SalOp *op){

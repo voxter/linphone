@@ -4576,6 +4576,10 @@ extern "C" jboolean Java_org_linphone_core_LinphoneCallImpl_autoAnswerRequested(
 	return (jboolean)linphone_call_asked_to_autoanswer((LinphoneCall *)lc);
 }
 
+extern "C" jint Java_org_linphone_core_LinphoneCallImpl_autoAnswerDelay(JNIEnv *env, jobject thiz, jlong lc){
+        return (jint)linphone_call_autoanswer_delay((LinphoneCall *)lc);
+}
+
 extern "C" void Java_org_linphone_core_LinphoneCallImpl_startRecording(JNIEnv *env, jobject thiz, jlong lc){
 	linphone_call_start_recording((LinphoneCall *)lc);
 }

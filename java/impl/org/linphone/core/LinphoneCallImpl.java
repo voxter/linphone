@@ -36,6 +36,7 @@ class LinphoneCallImpl implements LinphoneCall {
 	private native void enableCamera(long nativePtr, boolean enabled);
 	private native boolean cameraEnabled(long nativePtr);
 	private native boolean autoAnswerRequested(long nativePtr);
+	private native int autoAnswerDelay(long nativePtr);
 	private native void enableEchoCancellation(long nativePtr,boolean enable);
 	private native boolean isEchoCancellationEnabled(long nativePtr) ;
 	private native void enableEchoLimiter(long nativePtr,boolean enable);
@@ -110,6 +111,9 @@ class LinphoneCallImpl implements LinphoneCall {
 	}
         public boolean autoAnswerRequested() {
 		return autoAnswerRequested(nativePtr);
+        }
+        public int autoAnswerDelay() {
+                return autoAnswerDelay(nativePtr);
         }
 
 	@Override

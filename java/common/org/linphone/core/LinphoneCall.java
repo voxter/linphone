@@ -200,6 +200,7 @@ public interface LinphoneCall {
 	void enableCamera(boolean enabled);
 	boolean cameraEnabled();
 	boolean autoAnswerRequested();
+	int autoAnswerDelay();
 	
 	/**
 	 * Enables or disable echo cancellation.
