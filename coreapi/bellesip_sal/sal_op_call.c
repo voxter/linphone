@@ -18,6 +18,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 #include "sal_impl.h"
 #include "offeranswer.h"
+#include "regex.h"
+#include <string.h>
+#include <stdlib.h>
 
 static int extract_sdp(SalOp* op,belle_sip_message_t* message,belle_sdp_session_description_t** session_desc, SalReason *error);
 
