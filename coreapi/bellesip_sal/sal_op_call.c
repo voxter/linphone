@@ -526,6 +526,26 @@ static void sal_op_reset_descriptions(SalOp *op) {
 		op->result=NULL;
 	}
 }
+
+static int get_answer_after(char *source) {
+        const char *regexString= "answer-after=([0-9]+)";
+        regex_t regexCompiled;
+        regmatch_t match[2];
+        int result=0;
+        if (regcomp(&regexCompiled, regexString, REG_EXTENDED)) {
+                result=1;
+        };
+        int reti = regexec(&regexCompiled, source, 2, match, 0);
+        if (!reti) {
+                char str[10];
+                sprintf(str,"%.*s", (int) (match[1].rm_eo - match[1].rm_so), source + match[1].rm_so);
+                result=atoi(str);
+        }
+        regfree(&regexCompiled);
+        return result;
+}
+
+
 static void process_request_event(void *op_base, const belle_sip_request_event_t *event) {
 	SalOp* op = (SalOp*)op_base;
 	belle_sip_server_transaction_t* server_transaction=NULL;
@@ -576,7 +596,7 @@ static void process_request_event(void *op_base, const belle_sip_request_event_t
 				if ((call_info=belle_sip_message_get_header(BELLE_SIP_MESSAGE(req),"Call-Info"))) {
 					if( strstr(belle_sip_header_get_unparsed_value(call_info),"answer-after=") != NULL) {
 						op->auto_answer_asked=TRUE;
-						op->auto_answer_delay=atoi(belle_sip_header_get_unparsed_value(call_info),"answer-after=");
+						op->auto_answer_delay=get_answer_after(belle_sip_header_get_unparsed_value(call_info));
 						ms_message("The caller asked to automatically answer the call(Emergency?)\n");
 					}
 				}
