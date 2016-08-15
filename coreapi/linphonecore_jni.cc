@@ -4572,6 +4572,10 @@ extern "C" jboolean Java_org_linphone_core_LinphoneCallImpl_cameraEnabled(JNIEnv
 	return (jboolean)linphone_call_camera_enabled((LinphoneCall *)lc);
 }
 
+extern "C" jboolean Java_org_linphone_core_LinphoneCallImpl_autoAnswerRequested(JNIEnv *env, jobject thiz, jlong lc){
+	return (jboolean)linphone_call_asked_to_autoanswer((LinphoneCall *)lc);
+}
+
 extern "C" void Java_org_linphone_core_LinphoneCallImpl_startRecording(JNIEnv *env, jobject thiz, jlong lc){
 	linphone_call_start_recording((LinphoneCall *)lc);
 }
