@@ -530,15 +530,16 @@ static void sal_op_reset_descriptions(SalOp *op) {
 	}
 }
 
-static int get_answer_after(char *source) {
+static int get_answer_after(const char *source) {
         const char *regexString= "answer-after=([0-9]+)";
         regex_t regexCompiled;
         regmatch_t match[2];
         int result=0;
+	int reti;
         if (regcomp(&regexCompiled, regexString, REG_EXTENDED)) {
                 result=1;
         };
-        int reti = regexec(&regexCompiled, source, 2, match, 0);
+        reti = regexec(&regexCompiled, source, 2, match, 0);
         if (!reti) {
                 char str[10];
                 sprintf(str,"%.*s", (int) (match[1].rm_eo - match[1].rm_so), source + match[1].rm_so);

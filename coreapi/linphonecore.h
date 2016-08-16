@@ -728,6 +728,7 @@ LINPHONE_PUBLIC LinphoneCore *linphone_call_get_core(const LinphoneCall *call);
 
 LINPHONE_PUBLIC	LinphoneCallState linphone_call_get_state(const LinphoneCall *call);
 LINPHONE_PUBLIC bool_t linphone_call_asked_to_autoanswer(LinphoneCall *call);
+LINPHONE_PUBLIC int linphone_call_autoanswer_delay(LinphoneCall *call);
 
 /**
  * Get the remote address of the current call.
