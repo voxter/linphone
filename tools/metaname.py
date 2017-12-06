@@ -103,7 +103,7 @@ class Name(object):
 					res += elem.title()
 			return res
 		else:
-			return Name.to_camel_case(self.prev, fullName=True, lower=lower) + Name.to_camel_case(self)
+			return self.prev.to_camel_case(fullName=True, lower=lower) + self.to_camel_case()
 	
 	def concatenate(self, upper=False, fullName=False):
 		if self.prev is None or not fullName:
@@ -147,6 +147,9 @@ class ClassName(Name):
 	def to_c(self, addBrackets=False):
 		return self.to_camel_case(fullName=True)
 	
+	def from_c(self, name, **kargs):
+		self.from_camel_case(name, **kargs)
+	
 	def translate(self, translator, **params):
 		return translator.translate_class_name(self, **params)
 
@@ -154,6 +157,10 @@ class ClassName(Name):
 class InterfaceName(ClassName):
 	def to_c(self, addBrackets=False):
 		return ClassName.to_c(self)[:-8] + 'Cbs'
+	
+	def from_c(self, **kargs):
+		ClassName.from_c(self, **kargs)
+		self.words[-1] = 'listener'
 	
 	def translate(self, translator, **params):
 		return translator.translate_interface_name(self, **params)
@@ -190,6 +197,9 @@ class MethodName(Name):
 			cName += '()'
 		return cName
 	
+	def from_c(self, **kargs):
+		self.from_snake_case(**kargs)
+	
 	def translate(self, translator, **params):
 		return translator.translate_method_name(self, **params)
 
@@ -197,6 +207,9 @@ class MethodName(Name):
 class ArgName(Name):
 	def to_c(self, addBrackets=False):
 		return self.to_snake_case()
+	
+	def from_c(self, **kargs):
+		self.from_snake_case(**kargs)
 	
 	def translate(self, translator, **params):
 		return translator.translate_argument_name(self, **params)
