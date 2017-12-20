@@ -686,8 +686,6 @@ class CParser(object):
 		self.enumsIndex[cenum.publicName] = enum
 		if cenum.publicName in self.enum_relocations:
 			self._pending_enums.append(enum)
-		else:
-			self.namespace.addenum(enum)
 		return enum
 	
 	def parse_class(self, cclass):
