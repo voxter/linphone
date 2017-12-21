@@ -940,6 +940,13 @@ class Translator:
 		except KeyError:
 			raise ValueError("Invalid language code: '{0}'".format(langCode))
 
+	def _compute_namespace_name(self, namespace, type_):
+		if namespace is not None:
+			return namespace.name if namespace is not GlobalNs else None
+		else:
+			method = type_.find_first_ancestor_by_type(Method, Class, Namespace, Interface)
+			return metaname.Name.find_common_parent(type_.desc.name, method.name)
+
 
 class CLikeLangTranslator(Translator):
 	def translate_enumerator_value(self, value):
@@ -1066,37 +1073,22 @@ class CppLangTranslator(CLikeLangTranslator):
 			res += ' *'
 		return res
 	
-	def translate_enum_type(self, _type, showStdNs=True, namespace=None):
-		if _type.desc is None:
-			raise TranslationError('{0} has not been fixed'.format(_type.name))
+	def translate_enum_type(self, type_, showStdNs=True, namespace=None):
+		if type_.desc is None:
+			raise TranslationError('{0} has not been fixed'.format(type_.name))
+		nsName = self._compute_namespace_name(namespace, type_)
+		return type_.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
+
+	def translate_class_type(self, type_, showStdNs=True, namespace=None):
+		if type_.desc is None:
+			raise TranslationError('{0} has not been fixed'.format(type_.name))
+		nsName = self._compute_namespace_name(namespace, type_)
+		res = type_.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
 		
-		if namespace is not None:
-			nsName = namespace.name if namespace is not GlobalNs else None
-		else:
-			method = _type.find_first_ancestor_by_type(Method)
-			nsName = metaname.Name.find_common_parent(_type.desc.name, method.name)
-		
-		return _type.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
-	
-	def translate_class_type(self, _type, showStdNs=True, namespace=None):
-		if _type.desc is None:
-			raise TranslationError('{0} has not been fixed'.format(_type.name))
-		
-		if namespace is not None:
-			nsName = namespace.name if namespace is not GlobalNs else None
-		else:
-			method = _type.find_first_ancestor_by_type(Method)
-			nsName = metaname.Name.find_common_parent(_type.desc.name, method.name)
-		
-		if _type.desc.name.to_c() in self.ambigousTypes:
-			nsName = None
-		
-		res = _type.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
-		
-		if _type.desc.refcountable:
-			if _type.isconst:
+		if type_.desc.refcountable:
+			if type_.isconst:
 				res = 'const ' + res
-			if type(_type.parent) is Argument:
+			if type(type_.parent) is Argument:
 				return 'const {0}<{1}> &'.format(
 					CppLangTranslator.prepend_std('shared_ptr', showStdNs),
 					res
@@ -1107,7 +1099,7 @@ class CppLangTranslator(CLikeLangTranslator):
 					res
 				)
 		else:
-			if type(_type.parent) is Argument:
+			if type(type_.parent) is Argument:
 				return 'const {0} &'.format(res)
 			else:
 				return '{0}'.format(res)
@@ -1132,14 +1124,7 @@ class CppLangTranslator(CLikeLangTranslator):
 			)
 	
 	def translate_method_as_prototype(self, method, showStdNs=True, namespace=None):
-		_class = method.find_first_ancestor_by_type(Class, Interface)
-		if namespace is not None:
-			if _class.name.to_c() in self.ambigousTypes:
-				nsName = None
-			else:
-				nsName = namespace.name if namespace is not GlobalNs else None
-		else:
-			nsName = _class.name
+		nsName = self._compute_namespace_name(namespace, method)
 		
 		argsString = ''
 		argStrings = []
@@ -1158,6 +1143,12 @@ class CppLangTranslator(CLikeLangTranslator):
 	def prepend_std(string, prepend):
 		return 'std::' + string if prepend else string
 
+	def _compute_namespace_name(self, namespace, type_):
+		nsName = Translator._compute_namespace_name(self, namespace, type_)
+		if type_.desc.name.to_c() in self.ambigousTypes:
+			nsName = None
+		return nsName
+
 
 class JavaLangTranslator(CLikeLangTranslator):
 	def __init__(self):
@@ -1166,7 +1157,7 @@ class JavaLangTranslator(CLikeLangTranslator):
 		self.falseConstantToken = 'false'
 		self.trueConstantToken = 'true'
 	
-	def translate_base_type(self, type_, native=False, jni=False, isReturn=False):
+	def translate_base_type(self, type_, native=False, jni=False, isReturn=False, namespace=None):
 		if type_.name == 'string':
 			if jni:
 				return 'jstring'
@@ -1217,20 +1208,22 @@ class JavaLangTranslator(CLikeLangTranslator):
 			return 'Object'
 		return type_.name
 	
-	def translate_enum_type(self, _type, native=False, jni=False, isReturn=False):
+	def translate_enum_type(self, _type, native=False, jni=False, isReturn=False, namespace=None):
 		if native:
 			return 'int'
 		elif jni:
 			return 'jint'
 		else:
-			return _type.desc.name.to_camel_case()
+			nsName = self._compute_namespace_name(namespace, _type)
+			return _type.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
 	
-	def translate_class_type(self, _type, native=False, jni=False, isReturn=False):
+	def translate_class_type(self, _type, native=False, jni=False, isReturn=False, namespace=None):
 		if jni:
 			return 'jobject'
-		return _type.desc.name.to_camel_case()
+		nsName = self._compute_namespace_name(namespace, _type)
+		return _type.desc.name.translate(self.nameTranslator, recursive=True, topAncestor=nsName)
 	
-	def translate_list_type(self, _type, native=False, jni=False, isReturn=False):
+	def translate_list_type(self, _type, native=False, jni=False, isReturn=False, namespace=None):
 		if jni:
 			if type(_type.containedTypeDesc) is ClassType:
 				return 'jobjectArray'
