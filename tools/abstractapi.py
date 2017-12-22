@@ -477,6 +477,7 @@ class CParser(object):
 			'LinphoneAccountCreatorUsernameStatus'       : 'LinphoneAccountCreator',
 			'LinphoneCallDir'                            : 'LinphoneCall',
 			'LinphoneCallState'                          : 'LinphoneCall',
+			'LinphoneCallStatus'                         : 'LinphoneCall',
 			'LinphoneChatRoomState'                      : 'LinphoneChatRoom',
 			'LinphoneChatMessageDirection'               : 'LinphoneChatMessage',
 			'LinphoneChatMessageState'                   : 'LinphoneChatMessage',
