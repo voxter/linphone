@@ -43,6 +43,7 @@
 
 #define DB_MODULE_VERSION_EVENTS L_VERSION(1, 0, 0)
 #define DB_MODULE_VERSION_FRIENDS L_VERSION(1, 0, 0)
+#define DB_MODULE_VERSION_LEGACY_FRIENDS_IMPORT L_VERSION(1, 0, 0)
 #define DB_MODULE_VERSION_LEGACY_HISTORY_IMPORT L_VERSION(1, 0, 0)
 
 // =============================================================================
@@ -1084,13 +1085,13 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 	soci::session *inSession = inDbSession.getBackendSession<soci::session>();
 	soci::transaction tr(*dbSession.getBackendSession<soci::session>());
 
-	unsigned int version = getModuleVersion("legacy-history-import");
-	if (version >= L_VERSION(1, 0, 0))
+	if (getModuleVersion("legacy-history-import") >= L_VERSION(1, 0, 0))
 		return;
 	updateModuleVersion("legacy-history-import", DB_MODULE_VERSION_LEGACY_HISTORY_IMPORT);
 
 	soci::rowset<soci::row> messages = (inSession->prepare << "SELECT * FROM history");
 	try {
+		soci::session *session = dbSession.getBackendSession<soci::session>();
 		for (const auto &message : messages) {
 			const int direction = message.get<int>(LEGACY_MESSAGE_COL_DIRECTION);
 			if (direction != 0 && direction != 1) {
@@ -1147,7 +1148,6 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 				content.setAppData("legacy", appData);
 			}
 
-			soci::session *session = dbSession.getBackendSession<soci::session>();
 			const int &eventType = static_cast<int>(EventLog::Type::ConferenceChatMessage);
 			*session << "INSERT INTO event (type, creation_time) VALUES (:type, :creationTime)",
 				soci::use(eventType), soci::use(creationTime);
@@ -1189,6 +1189,42 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 	}
 
 	lInfo() << "Successful import of legacy messages.";
+}
+
+#define LEGACY_FRIEND_LIST_COL_NAME 1
+#define LEGACY_FRIEND_LIST_COL_RLS_URI 2
+#define LEGACY_FRIEND_LIST_COL_SYNC_URI 3
+#define LEGACY_FRIEND_LIST_COL_REVISION 4
+
+void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
+	soci::session *inSession = inDbSession.getBackendSession<soci::session>();
+	soci::transaction tr(*dbSession.getBackendSession<soci::session>());
+
+	if (getModuleVersion("legacy-friends-import") >= L_VERSION(1, 0, 0))
+		return;
+	updateModuleVersion("legacy-friends-import", DB_MODULE_VERSION_LEGACY_FRIENDS_IMPORT);
+
+	soci::rowset<soci::row> friendsLists = (inSession->prepare << "SELECT * FROM friends_lists");
+	try {
+		soci::session *session = dbSession.getBackendSession<soci::session>();
+		for (const auto &friendList : friendsLists) {
+			const string &name = friendList.get<string>(LEGACY_FRIEND_LIST_COL_NAME, "");
+			const string &rlsUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_RLS_URI, "");
+			const string &syncUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_SYNC_URI, "");
+			const unsigned int &revision = friendList.get<unsigned int>(LEGACY_FRIEND_LIST_COL_REVISION, 0);
+
+			*session << "INSERT INTO friends_list (name, rls_uri, sync_uri, revision) VALUES ("
+				"  :name, :rlsUri, :syncUri, :revision"
+				")", soci::use(name), soci::use(rlsUri), soci::use(syncUri), soci::use(revision);
+		}
+
+		tr.commit();
+	} catch (const exception &e) {
+		lInfo() << "Failed to import legacy friends lists: " << e.what() << ".";
+		return;
+	}
+
+	lInfo() << "Successful import of legacy friends.";
 }
 
 // -----------------------------------------------------------------------------
@@ -2529,6 +2565,10 @@ bool MainDb::import (Backend, const string &parameters) {
 
 	L_BEGIN_LOG_EXCEPTION
 	d->importLegacyHistory(inDbSession);
+	L_END_LOG_EXCEPTION
+
+	L_BEGIN_LOG_EXCEPTION
+	d->importLegacyFriends(inDbSession);
 	L_END_LOG_EXCEPTION
 
 	return true;

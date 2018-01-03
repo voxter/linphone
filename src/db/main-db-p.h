@@ -159,6 +159,7 @@ private:
 	// ---------------------------------------------------------------------------
 
 	void importLegacyHistory (DbSession &inDbSession);
+	void importLegacyFriends (DbSession &inDbSession);
 
 	L_DECLARE_PUBLIC(MainDb);
 };
