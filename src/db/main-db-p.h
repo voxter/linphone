@@ -154,6 +154,12 @@ private:
 	unsigned int getModuleVersion (const std::string &name);
 	void updateModuleVersion (const std::string &name, unsigned int version);
 
+	// ---------------------------------------------------------------------------
+	// Import.
+	// ---------------------------------------------------------------------------
+
+	void importLegacyHistory (DbSession &inDbSession);
+
 	L_DECLARE_PUBLIC(MainDb);
 };
 
