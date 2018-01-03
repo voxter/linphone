@@ -42,6 +42,7 @@
 #include "main-db-p.h"
 
 #define DB_MODULE_VERSION_EVENTS L_VERSION(1, 0, 0)
+#define DB_MODULE_VERSION_FRIENDS L_VERSION(1, 0, 0)
 #define DB_MODULE_VERSION_LEGACY_HISTORY_IMPORT L_VERSION(1, 0, 0)
 
 // =============================================================================
@@ -1336,12 +1337,60 @@ void MainDb::init () {
 	#endif
 
 	*session <<
+		"CREATE TABLE IF NOT EXISTS friends_list ("
+		"  id" + primaryKeyStr("INT UNSIGNED") + ","
+
+		"  name VARCHAR(255) UNIQUE,"
+		"  rls_uri VARCHAR(2047),"
+		"  sync_uri VARCHAR(2047),"
+		"  revision INT UNSIGNED NOT NULL"
+		") " + charset;
+
+	*session <<
+		"CREATE TABLE IF NOT EXISTS friend ("
+		"  id" + primaryKeyStr("INT UNSIGNED") + ","
+
+		"  sip_address_id" + primaryKeyRefStr("BIGINT UNSIGNED") + " NOT NULL,"
+		"  friend_list_id" + primaryKeyRefStr("INT UNSIGNED") + " NOT NULL,"
+
+		"  subscribe_policy TINYINT UNSIGNED NOT NULL,"
+		"  send_subscribe BOOLEAN NOT NULL,"
+		"  presence_enabled BOOLEAN NOT NULL,"
+
+		"  v_card MEDIUMTEXT,"
+		"  v_card_etag VARCHAR(255),"
+		"  v_card_sync_uri VARCHAR(2047),"
+		"  v_card_revision INT UNSIGNED NOT NULL,"
+
+		"  FOREIGN KEY (sip_address_id)"
+		"    REFERENCES sip_address(id)"
+		"    ON DELETE CASCADE,"
+		"  FOREIGN KEY (friend_list_id)"
+		"    REFERENCES friend_list(id)"
+		"    ON DELETE CASCADE"
+		") " + charset;
+
+	*session <<
+		"CREATE TABLE IF NOT EXISTS friend_app_data ("
+		"  friend_id" + primaryKeyRefStr("INT UNSIGNED") + ","
+
+		"  name VARCHAR(255),"
+		"  data BLOB NOT NULL,"
+
+		"  PRIMARY KEY (friend_id, name),"
+		"  FOREIGN KEY (friend_id)"
+		"    REFERENCES friend(id)"
+		"    ON DELETE CASCADE"
+		") " + charset;
+
+	*session <<
 		"CREATE TABLE IF NOT EXISTS db_module_version ("
 		"  name" + varcharPrimaryKeyStr(255) + ","
 		"  version INT UNSIGNED NOT NULL"
 		") " + charset;
 
 	d->updateModuleVersion("events", DB_MODULE_VERSION_EVENTS);
+	d->updateModuleVersion("friends", DB_MODULE_VERSION_FRIENDS);
 }
 
 bool MainDb::addEvent (const shared_ptr<EventLog> &eventLog) {
