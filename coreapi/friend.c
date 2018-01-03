@@ -41,6 +41,8 @@
 #endif
 
 #include "c-wrapper/c-wrapper.h"
+#include "core/core-p.h"
+#include "db/main-db.h"
 
 // TODO: From coreapi. Remove me later.
 #include "private.h"
@@ -529,11 +531,11 @@ void linphone_friend_invalidate_subscription(LinphoneFriend *lf){
 }
 
 static void close_presence_notification(SalPresenceOp *op) {
-    op->notify_presence_close();
+	op->notify_presence_close();
 }
 
 static void release_sal_op(SalOp *op) {
-    op->release();
+	op->release();
 }
 
 static void linphone_friend_close_incoming_subscriptions(LinphoneFriend *lf) {
@@ -1722,6 +1724,10 @@ bctbx_list_t* linphone_core_fetch_friends_lists_from_db(LinphoneCore *lc) {
 #endif
 
 void linphone_core_set_friends_database_path(LinphoneCore *lc, const char *path) {
+	if (!linphone_core_conference_server_enabled(lc))
+		L_GET_PRIVATE(lc->cppPtr)->mainDb->import(LinphonePrivate::MainDb::Sqlite3, path);
+
+	// TODO: Remove me later.
 	if (lc->friends_db_file){
 		ms_free(lc->friends_db_file);
 		lc->friends_db_file = NULL;

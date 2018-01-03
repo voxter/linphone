@@ -1206,21 +1206,27 @@ void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
 
 	soci::rowset<soci::row> friendsLists = (inSession->prepare << "SELECT * FROM friends_lists");
 	try {
+		set<string> names;
+
 		soci::session *session = dbSession.getBackendSession<soci::session>();
 		for (const auto &friendList : friendsLists) {
 			const string &name = friendList.get<string>(LEGACY_FRIEND_LIST_COL_NAME, "");
 			const string &rlsUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_RLS_URI, "");
 			const string &syncUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_SYNC_URI, "");
-			const unsigned int &revision = friendList.get<unsigned int>(LEGACY_FRIEND_LIST_COL_REVISION, 0);
+			const unsigned int &revision = static_cast<unsigned int>(friendList.get<int>(LEGACY_FRIEND_LIST_COL_REVISION, 0));
+
+			string uniqueName = name;
+			for (int id = 0; names.find(uniqueName) != names.end(); uniqueName = name + "-" + Utils::toString(id++));
+			names.insert(uniqueName);
 
 			*session << "INSERT INTO friends_list (name, rls_uri, sync_uri, revision) VALUES ("
 				"  :name, :rlsUri, :syncUri, :revision"
-				")", soci::use(name), soci::use(rlsUri), soci::use(syncUri), soci::use(revision);
+				")", soci::use(uniqueName), soci::use(rlsUri), soci::use(syncUri), soci::use(revision);
 		}
 
 		tr.commit();
 	} catch (const exception &e) {
-		lInfo() << "Failed to import legacy friends lists: " << e.what() << ".";
+		lInfo() << "Failed to import legacy friends: " << e.what() << ".";
 		return;
 	}
 
