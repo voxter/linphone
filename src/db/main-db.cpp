@@ -1053,6 +1053,94 @@ void MainDbPrivate::updateModuleVersion (const string &name, unsigned int versio
 
 // -----------------------------------------------------------------------------
 
+#define LEGACY_FRIEND_LIST_COL_ID 0
+#define LEGACY_FRIEND_LIST_COL_NAME 1
+#define LEGACY_FRIEND_LIST_COL_RLS_URI 2
+#define LEGACY_FRIEND_LIST_COL_SYNC_URI 3
+#define LEGACY_FRIEND_LIST_COL_REVISION 4
+
+#define LEGACY_FRIEND_COL_FRIEND_LIST_ID 1
+#define LEGACY_FRIEND_COL_SIP_ADDRESS 2
+#define LEGACY_FRIEND_COL_SUBSCRIBE_POLICY 3
+#define LEGACY_FRIEND_COL_SEND_SUBSCRIBE 4
+#define LEGACY_FRIEND_COL_V_CARD 6
+#define LEGACY_FRIEND_COL_V_CARD_ETAG 7
+#define LEGACY_FRIEND_COL_V_CARD_SYNC_URI 8
+#define LEGACY_FRIEND_COL_PRESENCE_RECEIVED 9
+
+void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
+	L_Q();
+
+	soci::session *inSession = inDbSession.getBackendSession<soci::session>();
+	soci::transaction tr(*dbSession.getBackendSession<soci::session>());
+
+	if (getModuleVersion("legacy-friends-import") >= L_VERSION(1, 0, 0))
+		return;
+	updateModuleVersion("legacy-friends-import", DB_MODULE_VERSION_LEGACY_FRIENDS_IMPORT);
+
+	unordered_map<int, long long> resolvedListsIds;
+	soci::session *session = dbSession.getBackendSession<soci::session>();
+
+	soci::rowset<soci::row> friendsLists = (inSession->prepare << "SELECT * FROM friends_lists");
+	try {
+		set<string> names;
+		for (const auto &friendList : friendsLists) {
+			const string &name = friendList.get<string>(LEGACY_FRIEND_LIST_COL_NAME, "");
+			const string &rlsUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_RLS_URI, "");
+			const string &syncUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_SYNC_URI, "");
+			const int &revision = friendList.get<int>(LEGACY_FRIEND_LIST_COL_REVISION, 0);
+
+			string uniqueName = name;
+			for (int id = 0; names.find(uniqueName) != names.end(); uniqueName = name + "-" + Utils::toString(id++));
+			names.insert(uniqueName);
+
+			*session << "INSERT INTO friends_list (name, rls_uri, sync_uri, revision) VALUES ("
+				"  :name, :rlsUri, :syncUri, :revision"
+				")", soci::use(uniqueName), soci::use(rlsUri), soci::use(syncUri), soci::use(revision);
+			resolvedListsIds[friendList.get<int>(LEGACY_FRIEND_LIST_COL_ID)] = q->getLastInsertId();
+		}
+	} catch (const exception &e) {
+		lWarning() << "Failed to import legacy friends list: " << e.what() << ".";
+		return;
+	}
+
+	soci::rowset<soci::row> friends = (inSession->prepare << "SELECT * FROM friends");
+	try {
+		for (const auto &friendInfo : friends) {
+			long long friendsListId;
+			{
+				auto it = resolvedListsIds.find(friendInfo.get<int>(LEGACY_FRIEND_COL_FRIEND_LIST_ID, -1));
+				if (it == resolvedListsIds.end())
+					continue;
+				friendsListId = it->second;
+			}
+
+			const long long &sipAddressId = insertSipAddress(friendInfo.get<string>(LEGACY_FRIEND_COL_SIP_ADDRESS, ""));
+			const int &subscribePolicy = friendInfo.get<int>(LEGACY_FRIEND_COL_SUBSCRIBE_POLICY, LinphoneSPAccept);
+			const int &sendSubscribe = friendInfo.get<int>(LEGACY_FRIEND_COL_SEND_SUBSCRIBE, 1);
+			const string &vCard = friendInfo.get<string>(LEGACY_FRIEND_COL_V_CARD, "");
+			const string &vCardEtag = friendInfo.get<string>(LEGACY_FRIEND_COL_V_CARD_ETAG, "");
+			const string &vCardSyncUri = friendInfo.get<string>(LEGACY_FRIEND_COL_V_CARD_SYNC_URI, "");
+			const int &presenceReveived = friendInfo.get<int>(LEGACY_FRIEND_COL_PRESENCE_RECEIVED, 0);
+
+			*session << "INSERT INTO friend ("
+				"  sip_address_id, friends_list_id, subscribe_policy, send_subscribe,"
+				"  presence_received, v_card, v_card_etag, v_card_sync_uri"
+				") VALUES ("
+				"  :sipAddressId, :friendsListId, :subscribePolicy, :sendSubscribe,"
+				"  :presenceReceived, :vCard, :vCardEtag, :vCardSyncUri"
+				")", soci::use(sipAddressId), soci::use(friendsListId), soci::use(subscribePolicy), soci::use(sendSubscribe),
+				soci::use(presenceReveived), soci::use(vCard), soci::use(vCardEtag), soci::use(vCardSyncUri);
+		}
+		tr.commit();
+	} catch (const exception &e) {
+		lWarning() << "Failed to import legacy friends: " << e.what() << ".";
+		return;
+	}
+
+	lInfo() << "Successful import of legacy friends.";
+}
+
 #define LEGACY_MESSAGE_COL_LOCAL_ADDRESS 1
 #define LEGACY_MESSAGE_COL_REMOTE_ADDRESS 2
 #define LEGACY_MESSAGE_COL_DIRECTION 3
@@ -1184,53 +1272,11 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 
 		tr.commit();
 	} catch (const exception &e) {
-		lInfo() << "Failed to import legacy messages: " << e.what() << ".";
+		lWarning() << "Failed to import legacy messages: " << e.what() << ".";
 		return;
 	}
 
 	lInfo() << "Successful import of legacy messages.";
-}
-
-#define LEGACY_FRIEND_LIST_COL_NAME 1
-#define LEGACY_FRIEND_LIST_COL_RLS_URI 2
-#define LEGACY_FRIEND_LIST_COL_SYNC_URI 3
-#define LEGACY_FRIEND_LIST_COL_REVISION 4
-
-void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
-	soci::session *inSession = inDbSession.getBackendSession<soci::session>();
-	soci::transaction tr(*dbSession.getBackendSession<soci::session>());
-
-	if (getModuleVersion("legacy-friends-import") >= L_VERSION(1, 0, 0))
-		return;
-	updateModuleVersion("legacy-friends-import", DB_MODULE_VERSION_LEGACY_FRIENDS_IMPORT);
-
-	soci::rowset<soci::row> friendsLists = (inSession->prepare << "SELECT * FROM friends_lists");
-	try {
-		set<string> names;
-
-		soci::session *session = dbSession.getBackendSession<soci::session>();
-		for (const auto &friendList : friendsLists) {
-			const string &name = friendList.get<string>(LEGACY_FRIEND_LIST_COL_NAME, "");
-			const string &rlsUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_RLS_URI, "");
-			const string &syncUri = friendList.get<string>(LEGACY_FRIEND_LIST_COL_SYNC_URI, "");
-			const unsigned int &revision = static_cast<unsigned int>(friendList.get<int>(LEGACY_FRIEND_LIST_COL_REVISION, 0));
-
-			string uniqueName = name;
-			for (int id = 0; names.find(uniqueName) != names.end(); uniqueName = name + "-" + Utils::toString(id++));
-			names.insert(uniqueName);
-
-			*session << "INSERT INTO friends_list (name, rls_uri, sync_uri, revision) VALUES ("
-				"  :name, :rlsUri, :syncUri, :revision"
-				")", soci::use(uniqueName), soci::use(rlsUri), soci::use(syncUri), soci::use(revision);
-		}
-
-		tr.commit();
-	} catch (const exception &e) {
-		lInfo() << "Failed to import legacy friends: " << e.what() << ".";
-		return;
-	}
-
-	lInfo() << "Successful import of legacy friends.";
 }
 
 // -----------------------------------------------------------------------------
@@ -1534,22 +1580,21 @@ void MainDb::init () {
 		"  id" + primaryKeyStr("INT UNSIGNED") + ","
 
 		"  sip_address_id" + primaryKeyRefStr("BIGINT UNSIGNED") + " NOT NULL,"
-		"  friend_list_id" + primaryKeyRefStr("INT UNSIGNED") + " NOT NULL,"
+		"  friends_list_id" + primaryKeyRefStr("INT UNSIGNED") + " NOT NULL,"
 
 		"  subscribe_policy TINYINT UNSIGNED NOT NULL,"
 		"  send_subscribe BOOLEAN NOT NULL,"
-		"  presence_enabled BOOLEAN NOT NULL,"
+		"  presence_received BOOLEAN NOT NULL,"
 
 		"  v_card MEDIUMTEXT,"
 		"  v_card_etag VARCHAR(255),"
 		"  v_card_sync_uri VARCHAR(2047),"
-		"  v_card_revision INT UNSIGNED NOT NULL,"
 
 		"  FOREIGN KEY (sip_address_id)"
 		"    REFERENCES sip_address(id)"
 		"    ON DELETE CASCADE,"
-		"  FOREIGN KEY (friend_list_id)"
-		"    REFERENCES friend_list(id)"
+		"  FOREIGN KEY (friends_list_id)"
+		"    REFERENCES friends_list(id)"
 		"    ON DELETE CASCADE"
 		") " + charset;
 
@@ -2570,11 +2615,11 @@ bool MainDb::import (Backend, const string &parameters) {
 	}
 
 	L_BEGIN_LOG_EXCEPTION
-	d->importLegacyHistory(inDbSession);
+	d->importLegacyFriends(inDbSession);
 	L_END_LOG_EXCEPTION
 
 	L_BEGIN_LOG_EXCEPTION
-	d->importLegacyFriends(inDbSession);
+	d->importLegacyHistory(inDbSession);
 	L_END_LOG_EXCEPTION
 
 	return true;

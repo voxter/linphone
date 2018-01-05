@@ -158,8 +158,8 @@ private:
 	// Import.
 	// ---------------------------------------------------------------------------
 
-	void importLegacyHistory (DbSession &inDbSession);
 	void importLegacyFriends (DbSession &inDbSession);
+	void importLegacyHistory (DbSession &inDbSession);
 
 	L_DECLARE_PUBLIC(MainDb);
 };
