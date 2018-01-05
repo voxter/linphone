@@ -1053,6 +1053,19 @@ void MainDbPrivate::updateModuleVersion (const string &name, unsigned int versio
 
 // -----------------------------------------------------------------------------
 
+template<typename T>
+static T getValueFromRow (const soci::row &row, int index, bool &isNull) {
+	isNull = false;
+
+	try {
+		return row.get<T>(static_cast<size_t>(index));
+	} catch (const exception &) {
+		isNull = true;
+	}
+
+	return T();
+}
+
 #define LEGACY_FRIEND_LIST_COL_ID 0
 #define LEGACY_FRIEND_LIST_COL_NAME 1
 #define LEGACY_FRIEND_LIST_COL_RLS_URI 2
@@ -1063,6 +1076,7 @@ void MainDbPrivate::updateModuleVersion (const string &name, unsigned int versio
 #define LEGACY_FRIEND_COL_SIP_ADDRESS 2
 #define LEGACY_FRIEND_COL_SUBSCRIBE_POLICY 3
 #define LEGACY_FRIEND_COL_SEND_SUBSCRIBE 4
+#define LEGACY_FRIEND_COL_REF_KEY 5
 #define LEGACY_FRIEND_COL_V_CARD 6
 #define LEGACY_FRIEND_COL_V_CARD_ETAG 7
 #define LEGACY_FRIEND_COL_V_CARD_SYNC_URI 8
@@ -1131,6 +1145,13 @@ void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
 				"  :presenceReceived, :vCard, :vCardEtag, :vCardSyncUri"
 				")", soci::use(sipAddressId), soci::use(friendsListId), soci::use(subscribePolicy), soci::use(sendSubscribe),
 				soci::use(presenceReveived), soci::use(vCard), soci::use(vCardEtag), soci::use(vCardSyncUri);
+
+			bool isNull;
+			const string &data = getValueFromRow<string>(friendInfo, LEGACY_FRIEND_COL_REF_KEY, isNull);
+			if (!isNull)
+				*session << "INSERT INTO friend_app_data (friend_id, name, data) VALUES"
+					" (:friendId, 'legacy', :data)",
+					soci::use(q->getLastInsertId()), soci::use(data);
 		}
 		tr.commit();
 	} catch (const exception &e) {
@@ -1153,19 +1174,6 @@ void MainDbPrivate::importLegacyFriends (DbSession &inDbSession) {
 #define LEGACY_MESSAGE_COL_IMDN_MESSAGE_ID 12
 #define LEGACY_MESSAGE_COL_CONTENT_TYPE 13
 #define LEGACY_MESSAGE_COL_IS_SECURED 14
-
-template<typename T>
-static T getValueFromLegacyMessage (const soci::row &message, int index, bool &isNull) {
-	isNull = false;
-
-	try {
-		return message.get<T>(static_cast<size_t>(index));
-	} catch (const exception &) {
-		isNull = true;
-	}
-
-	return T();
-}
 
 void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 	L_Q();
@@ -1198,7 +1206,7 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 			const tm &creationTime = Utils::getTimeTAsTm(message.get<int>(LEGACY_MESSAGE_COL_DATE, 0));
 
 			bool isNull;
-			getValueFromLegacyMessage<string>(message, LEGACY_MESSAGE_COL_URL, isNull);
+			getValueFromRow<string>(message, LEGACY_MESSAGE_COL_URL, isNull);
 
 			const int &contentId = message.get<int>(LEGACY_MESSAGE_COL_CONTENT_ID, -1);
 			ContentType contentType(message.get<string>(LEGACY_MESSAGE_COL_CONTENT_TYPE, ""));
@@ -1211,7 +1219,7 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 				continue;
 			}
 
-			const string &text = getValueFromLegacyMessage<string>(message, LEGACY_MESSAGE_COL_TEXT, isNull);
+			const string &text = getValueFromRow<string>(message, LEGACY_MESSAGE_COL_TEXT, isNull);
 
 			Content content;
 			content.setContentType(contentType);
@@ -1227,7 +1235,7 @@ void MainDbPrivate::importLegacyHistory (DbSession &inDbSession) {
 					continue;
 				}
 
-				const string appData = getValueFromLegacyMessage<string>(message, LEGACY_MESSAGE_COL_APP_DATA, isNull);
+				const string appData = getValueFromRow<string>(message, LEGACY_MESSAGE_COL_APP_DATA, isNull);
 				if (isNull) {
 					lWarning() << "Unable to import legacy file message without app data.";
 					continue;
